@@ -4,6 +4,8 @@ if [[ "$(whoami)" != root ]]; then
     exec sudo -- "$0" "$@"
 fi
 
+yol="/home/$SUDO_USER/.local/share/nautilus-python/extensions"
+
 # python-nautilus indirilecek
 echo "---> python-nautilus dosyası depodan indirilerek kuruluyor..."
 if type "apt" > /dev/null 2>&1
@@ -20,20 +22,51 @@ else
 fi
 sleep 2
 
-# eski kurulum dosyaları silicencek
-echo "---> Önceki sürümler aranıyor ve kaldırılıyor..."
-mkdir -p /home/$SUDO_USER/.local/share/nautilus-python/extensions
+
+if [[ -d $yol ]]; then
+	echo "---> Önceki sürümler kaldırılıyor..."
+	rm -rf $yol/backspace-up*
+	sleep 1
+fi
+
+if [[ ! -d $yol ]]; then
+	echo "---> Eklenti için klasör oluşturuluyor..."
+	mkdir -p $yol
+fi
+
+
+echo "---> $yol/backspace-up.py dosyası oluşturuluyor..."
+
+tee > $yol/backspace-up.py << EOF
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# by Ricardo Lenz, 2016-jun
+# riclc@hotmail.com
+#
+
+import os, gi
+gi.require_version('Nautilus', '3.0')
+from gi.repository import GObject, Nautilus, Gtk, Gio, GLib
+
+def ok():
+    app = Gtk.Application.get_default()
+    app.set_accels_for_action( "win.up", ["BackSpace"] )
+
+class BackspaceBack(GObject.GObject, Nautilus.LocationWidgetProvider):
+    def __init__(self):
+        pass
+    
+    def get_widget(self, uri, window):
+        ok()
+        return None
+
+EOF
+
+chmod a+rx -R $yol/backspace-up.py
 chown -R $SUDO_USER. /home/$SUDO_USER/.local/share/nautilus-python/
-rm -f /home/$SUDO_USER/.local/share/nautilus-python/extensions/backspace-up.py
-rm -f /home/$SUDO_USER/.local/share/nautilus-python/extensions/BackspaceBack.py
+
 sleep 2
-
-
-# python eklentisi indirilecek ve ilgili dizine kopyalanacak
-echo "---> Yeni sürüm indiriliyor ve kuruluyor..."
-wget --show-progress -q -nc https://kod.pardus.org.tr/yahyayildirim/backspace/raw/main/backspace-up.py -O /home/$SUDO_USER/.local/share/nautilus-python/extensions/backspace-up.py 2> /dev/null
-chmod +xr /home/$SUDO_USER/.local/share/nautilus-python/extensions/backspace-up.py
-sleep 1
 
 # Kurulum tamamlandı
 
@@ -45,7 +78,7 @@ if [ `ps awx | grep nautilus | grep -v grep | wc -l` -eq 0 ]; then
 		read -s -n1
 		exit 0
 	done
-elif [ `ps awx | grep nautilus | grep -v grep | wc -l` == 1 ]; then
+elif [ `ps awx | grep nautilus | grep -v grep | wc -l` -gt 0 ]; then
 	killall nautilus
 	sleep 2
 	echo '---> Kurulum tamamlandı. Çıkmak için bir tuşa basın.'
